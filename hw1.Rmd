@@ -1,0 +1,218 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+require(quantmod)
+require(PerformanceAnalytics)
+require(xts)
+require(TTR)
+require(fitdistrplus)
+
+getSymbols("AAPL", src = "yahoo")
+getSymbols("INTC", src = "yahoo")
+getSymbols("NVDA", src = "yahoo")
+AAPL = AAPL["2008-08-01/2018-08-01"]
+INTC = INTC["2008-08-01/2018-08-01"]
+NVDA = NVDA["2008-08-01/2018-08-01"]
+plot(AAPL,main="AAPL")
+plot(INTC,main="INTC")
+plot(NVDA,main="NVDA")
+```
+```{r}
+aplRd = periodReturn(AAPL,period="daily")
+aplRdL = periodReturn(AAPL,period="daily", type="log")
+aplRa = annualReturn(AAPL)
+plot(aplRd, main="APPLE daily returns")
+plot(aplRdL, main="APPLE daily log returns")
+plot(aplRa, main="APPLE annual returns")
+
+itlRd = periodReturn(INTC,period="daily")
+itlRdL = periodReturn(INTC,period="daily", type="log")
+itlRa = annualReturn(INTC)
+plot(itlRd, main="INTC daily returns")
+plot(itlRdL, main="INTC daily log returns")
+plot(itlRa, main="INTC annual returns")
+
+nvdRd = periodReturn(NVDA,period="daily")
+nvdRdL = periodReturn(NVDA,period="daily", type="log")
+nvdRa = annualReturn(NVDA)
+plot(nvdRd, main="NVDA daily returns")
+plot(nvdRdL, main="NVDA daily log returns")
+plot(nvdRa, main="NVDA annual returns")
+```
+```{r}
+histogram_plot <- function(x){
+  DS = density(x)
+  yl=c(min(DS$y),max(DS$y)) #set y limits
+  hist(x,probability=T, main=NULL,ylim=yl)
+  rug(x); lines(DS); a=seq(min(x),max(x),0.001)
+  points(a,dnorm(a,mean(x),sd(x)), type="l",lty=2)
+}
+aplR = as.numeric(aplRd)
+histogram_plot(aplR)
+histogram_plot(exp(aplR))
+shapiro.test(aplR)
+shapiro.test(exp(aplR))
+
+itlR = as.numeric(itlRd)
+histogram_plot(itlR)
+histogram_plot(exp(itlR))
+shapiro.test(itlR)
+shapiro.test(exp(itlR))
+
+nvdR = as.numeric(nvdRd)
+histogram_plot(nvdR)
+histogram_plot(exp(nvdR))
+shapiro.test(nvdR)
+shapiro.test(exp(nvdR))
+```
+
+```{r}
+itR = data.frame(aplRd=aplRd, itlRd, nvdRd)
+colnames(itR) <- c("aplR", "itlR", "nvdR")
+
+itRlog = data.frame(aplRd=aplRd, itlRd, nvdRd)
+colnames(itRlog) <- c("aplR", "itlR", "nvdR")
+
+cov(itR, use="complete.obs")
+cor(itR, method="pearson")
+cor(itR, method="kendall")
+```
+
+```{r}
+AAPLohlc <- AAPL[,c("AAPL.Open","AAPL.High","AAPL.Low","AAPL.Close")]
+AAPLvClose <- volatility(AAPLohlc,calc="close",N=252)
+#AAPLvParkinson <- volatility(AAPLohlc,calc="parkinson",N=252)
+#AAPLvGK <- volatility(AAPLohlc,calc="garman",N=252)
+plot(AAPLvClose, main="AAPL Close-to-Close volatility", xlab="Date", ylab="Volatility")
+
+INTCohlc <- INTC[,c("INTC.Open","INTC.High","INTC.Low","INTC.Close")]
+INTCvClose <- volatility(INTCohlc,calc="close",N=252)
+#INTCvParkinson <- volatility(INTCohlc,calc="parkinson",N=252)
+#INTCvGK <- volatility(INTCohlc,calc="garman",N=252)
+plot(INTCvClose, main="INTC Close-to-Close volatility", xlab="Date", ylab="Volatility")
+
+NVDAohlc <- NVDA[,c("NVDA.Open","NVDA.High","NVDA.Low","NVDA.Close")]
+NVDAvClose <- volatility(NVDAohlc,calc="close",N=252)
+#NVDAvParkinson <- volatility(NVDAohlc,calc="parkinson",N=252)
+#NVDAvGK <- volatility(NVDAohlc,calc="garman",N=252)
+plot(NVDAvClose, main="NVDA Close-to-Close volatility", xlab="Date", ylab="Volatility")
+#plot(AAPLvParkinson, main="AAPL Parkinson estimator")
+#plot(AAPLvGK, main="AAPL Garman and Klass estimator ")
+
+```
+
+```{r}
+getSymbols("DJIA", src="FRED")
+serie=DJIA["2008/2018"]
+price=as.numeric(serie) #extract numeric values of price
+time = index(serie) #extract the indices
+x=1:length(price)
+model=lm(log(price)~x)
+expo=exp(model$coef[1]+model$coef[2]*x)
+plot(x=time,y=price, main="Dow Jones",type="l")
+lines(time,expo,col=2,lwd=2)
+```
+
+```{r}
+### Part I: preprocessing the data ##########
+# load the financial data from wdir
+ALV = read.csv("DAX_data/ALV.csv", sep=",", header=T)
+BMW = read.csv("DAX_data/BMW.csv", sep=",", header=T)
+CBK = read.csv("DAX_data/CBK.csv", sep=",", header=T)
+TKA = read.csv("DAX_data/TKA.csv", sep=",", header=T)
+
+alvAC= ALV$AdjClose[1:252]
+bmwAC = BMW$AdjClose[1:252]
+cbkAC = CBK$AdjClose[1:252]
+tkaAC = TKA$AdjClose[1:252]
+
+date= factor(ALV$Date[1:252]) # extract the column Date
+dax =data.frame(date, alvAC, bmwAC, cbkAC, tkaAC)
+
+# plot Adjusted prices vs date for ALV
+plot(dax$date, dax$alvAC, type="l",main="ALV.DE", xlab="dates", ylab="adj. close")
+plot(dax$date, dax$bmwAC, type="l",main="BMW.DE", xlab="dates", ylab="adj. close")
+plot(dax$date, dax$cbkAC, type="l",main="CBK.DE", xlab="dates", ylab="adj. close")
+plot(dax$date, dax$tkaAC, type="l",main="TKA.DE", xlab="dates", ylab="adj. close")
+
+# Compute Returns. First define vectors of appropriate length
+alvR = vector(,252)
+for (i in 1:252){alvR[i] <-(alvAC[i]/alvAC[i+1]) -1 }
+bmwR = vector(,252)
+for (i in 1:252){bmwR[i] <-(bmwAC[i]/bmwAC[i+1]) -1 }
+cbkR = vector(,252)
+for (i in 1:252){cbkR[i] <-(cbkAC[i]/cbkAC[i+1]) -1 }
+tkaR = vector(,252)
+for (i in 1:252){tkaR[i] <-(tkaAC[i]/tkaAC[i+1]) -1 }
+
+#same with bmwR, cbkR, tkaR
+# Remember dates are ordered descending. Make table Returns
+daxR =data.frame(dax$date,alvR,bmwR,cbkR,tkaR)
+# Compute log returns (omit  column of dates)
+alvRlog = vector(,252)
+for (i in 1:252){alvRlog[i] <- (log(alvAC[i])-log(alvAC[i+1]))}
+bmwRlog = vector(,252)
+for (i in 1:252){bmwRlog[i] <- (log(bmwAC[i])-log(bmwAC[i+1]))}
+cbkRlog = vector(,252)
+for (i in 1:252){cbkRlog[i] <- (log(cbkAC[i])-log(cbkAC[i+1]))}
+tkaRlog = vector(,252)
+for (i in 1:252){tkaRlog[i] <- (log(tkaAC[i])-log(tkaAC[i+1]))}
+daxRlog=data.frame(dax$date,alvRlog,bmwRlog,cbkRlog,tkaRlog)
+#plot returns and log returns (in red) and see coincidences:
+plot(dax$date,daxR$alvR, type="l",xlab="dates",ylab="returns")
+lines(dax$date,daxRlog$alvR, type="l",col="red")
+
+#### Part II: Basic statistics ############
+library(fBasics) ## load the library "fBasics"
+basicStats(daxRlog$alvR)
+## You can compute basic stats to a full data frame,
+## omitting non numeric data
+basicStats(na.omit(daxRlog[,2:5]))
+##Use a boxplot to help visualising and interpret results
+boxplot(daxRlog[,2:5])
+##compute covariance matrix
+cov(daxRlog[,2:5],use="complete.obs")
+```
+
+```{r}
+Rdlog = alvRlog
+price = ALV$AdjClose[1:252]
+upper_bound = vector(,252)
+lower_bound = vector(,252)
+result = vector(,252)
+
+# parameters
+obs = 45
+t_ahead = 5
+z = 1.96 
+for (i in (obs+1):252) {
+  p0 = price[i]
+  mR = mean(Rdlog[(i-obs):i])
+  vR = sd(Rdlog[(i-obs):i])
+  lower_bound[i] = p0*exp(mR*t_ahead-z*vR*sqrt(t_ahead))
+  upper_bound[i] = p0*exp(mR*t_ahead+z*vR*sqrt(t_ahead))
+  #compare result 
+}
+#print result 
+cTrue = 0 
+cFalse = 0 
+for (i in (obs+t_ahead):(252-t_ahead)) {
+  if (price[i] > lower_bound[i-t_ahead] && price[i] < upper_bound[i-t_ahead] ) {
+    result[i] = TRUE
+    cTrue = cTrue+1
+  } else {
+    result[i] = FALSE
+    cFalse = cFalse+1
+  }
+}
+
+# % of True
+pTrue = cTrue/(cTrue+cFalse)
+print(pTrue*100)
+
+# % of False
+pFalse = cFalse/(cTrue+cFalse)
+print(pFalse*100)
+```
